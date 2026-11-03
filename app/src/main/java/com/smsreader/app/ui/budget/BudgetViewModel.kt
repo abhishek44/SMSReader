@@ -3,6 +3,7 @@ package com.smsreader.app.ui.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smsreader.app.data.local.dao.BudgetProgressRow
+import com.smsreader.app.data.local.dao.SubcategorySpendRow
 import com.smsreader.app.data.local.entity.CategoryEntity
 import com.smsreader.app.data.repository.FinanceRepository
 import com.smsreader.app.domain.model.BudgetPeriod
@@ -16,11 +17,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-
 data class BudgetUiState(
     val period: BudgetPeriod = BudgetPeriod.MONTHLY,
     val categories: List<CategoryEntity> = emptyList(),
     val rows: List<BudgetProgressRow> = emptyList(),
+    val subcategorySpend: List<SubcategorySpendRow> = emptyList(),
     val message: String? = null
 )
 
@@ -34,13 +35,20 @@ class BudgetViewModel(private val repository: FinanceRepository) : ViewModel() {
         repository.observeBudgetProgress(p, range)
     }
 
+    private val subcategorySpend = period.flatMapLatest { p ->
+        val range = if (p == BudgetPeriod.MONTHLY) DateRanges.thisMonth() else DateRanges.thisYear()
+        repository.observeSubcategorySpend(range)
+    }
+
     val uiState: StateFlow<BudgetUiState> = combine(
         period,
-        repository.observeMainCategories(),
+        repository.observeCategories(),
         rows,
+        subcategorySpend,
         message
-    ) { p, categories, budgetRows, msg -> BudgetUiState(p, categories, budgetRows, msg) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BudgetUiState())
+    ) { p, categories, budgetRows, subcatSpend, msg ->
+        BudgetUiState(p, categories, budgetRows, subcatSpend, msg)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BudgetUiState())
 
     fun setPeriod(value: BudgetPeriod) { period.value = value }
 

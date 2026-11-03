@@ -38,6 +38,9 @@ interface AccountDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<AccountEntity>)
+
+    @Query("DELETE FROM accounts WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }
 
 @Dao
@@ -65,6 +68,12 @@ interface CategoryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<CategoryEntity>)
+
+    @Query("DELETE FROM categories WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM categories WHERE parent_id = :parentId")
+    suspend fun deleteByParentId(parentId: Long)
 }
 
 @Dao
@@ -224,6 +233,15 @@ interface TransactionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<TransactionEntity>)
+
+    @Query("DELETE FROM transactions WHERE account_id = :accountId")
+    suspend fun deleteByAccountId(accountId: Long)
+
+    @Query("DELETE FROM transactions WHERE l1_category_id = :categoryId")
+    suspend fun deleteByL1CategoryId(categoryId: Long)
+
+    @Query("UPDATE transactions SET l2_category_id = NULL WHERE l2_category_id = :subCategoryId")
+    suspend fun clearL2Category(subCategoryId: Long)
 }
 
 data class BudgetProgressRow(
@@ -232,6 +250,13 @@ data class BudgetProgressRow(
     val categoryName: String,
     val limitMinor: Long,
     val spentMinor: Long
+)
+
+data class SubcategorySpendRow(
+    val l1CategoryId: Long,
+    val l2CategoryId: Long?,
+    val l2CategoryName: String?,
+    val totalMinor: Long
 )
 
 @Dao
@@ -267,6 +292,29 @@ interface BudgetDao {
 
     @Query("SELECT * FROM budgets")
     suspend fun getAll(): List<BudgetEntity>
+
+    @Query("DELETE FROM budgets WHERE l1_category_id = :categoryId")
+    suspend fun deleteByCategoryId(categoryId: Long)
+
+    @Query(
+        """
+        SELECT
+            t.l1_category_id AS l1CategoryId,
+            t.l2_category_id AS l2CategoryId,
+            c.name AS l2CategoryName,
+            COALESCE(SUM(t.amount_minor), 0) AS totalMinor
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.l2_category_id
+        WHERE t.transaction_type = 'DEBIT'
+          AND t.transaction_date >= :startInclusive
+          AND t.transaction_date < :endExclusive
+        GROUP BY t.l1_category_id, t.l2_category_id, c.name
+        """
+    )
+    fun observeSubcategorySpend(
+        startInclusive: Long,
+        endExclusive: Long
+    ): Flow<List<SubcategorySpendRow>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entity: BudgetEntity): Long

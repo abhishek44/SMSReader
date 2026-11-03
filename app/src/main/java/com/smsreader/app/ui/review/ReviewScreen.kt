@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -298,7 +299,6 @@ private fun PermissionCard(
 @Composable
 private fun ReviewCard(item: SmsReviewItemEntity, onClick: () -> Unit) {
     val headerTitle = item.sender ?: item.detectedMerchant ?: "SMS Alert"
-    val avatarChar = headerTitle.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar() ?: 'S'
 
     Card(
         onClick = onClick,
@@ -320,11 +320,11 @@ private fun ReviewCard(item: SmsReviewItemEntity, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = avatarChar.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Pending SMS",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -400,7 +400,6 @@ private fun ReviewCard(item: SmsReviewItemEntity, onClick: () -> Unit) {
 @Composable
 private fun ReviewedCard(item: ConfirmedReviewItemRow, onClick: () -> Unit) {
     val titleText = item.merchantName ?: item.sender ?: item.description
-    val avatarChar = titleText.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar() ?: 'R'
     val isDebit = item.transactionType == TransactionType.DEBIT
 
     Card(
@@ -423,11 +422,11 @@ private fun ReviewedCard(item: ConfirmedReviewItemRow, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = avatarChar.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Reviewed Transaction",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }

@@ -1,6 +1,11 @@
 package com.smsreader.app.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -8,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -23,12 +29,12 @@ import com.smsreader.app.ui.manage.ManageScreen
 import com.smsreader.app.ui.review.ReviewScreen
 import com.smsreader.app.ui.review.ReviewViewModel
 
-private data class AppDestination(val route: String, val label: String, val glyph: String)
+private data class AppDestination(val route: String, val label: String, val icon: ImageVector)
 
 private val destinations = listOf(
-    AppDestination("review", "Review", "R"),
-    AppDestination("analytics", "Analytics", "A"),
-    AppDestination("budget", "Budget", "B")
+    AppDestination("review", "Review", Icons.Default.Notifications),
+    AppDestination("analytics", "Analytics", Icons.AutoMirrored.Filled.List),
+    AppDestination("budget", "Budget", Icons.Default.ShoppingCart)
 )
 
 @Composable
@@ -52,7 +58,7 @@ fun SmsReaderApp() {
                                     restoreState = true
                                 }
                             },
-                            icon = { Text(destination.glyph) },
+                            icon = { Icon(destination.icon, contentDescription = destination.label) },
                             label = { Text(destination.label) }
                         )
                     }

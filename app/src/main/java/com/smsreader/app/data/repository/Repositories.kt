@@ -6,6 +6,7 @@ import com.smsreader.app.data.local.dao.AnalyticsSummaryRow
 import com.smsreader.app.data.local.dao.BudgetProgressRow
 import com.smsreader.app.data.local.dao.CategorySpendRow
 import com.smsreader.app.data.local.dao.ConfirmedReviewItemRow
+import com.smsreader.app.data.local.dao.SubcategorySpendRow
 import com.smsreader.app.data.local.entity.AccountEntity
 import com.smsreader.app.data.local.entity.BudgetEntity
 import com.smsreader.app.data.local.entity.CategoryEntity
@@ -229,6 +230,11 @@ class FinanceRepository(private val database: AppDatabase) {
         )
     }
 
+    suspend fun deleteAccount(id: Long) = database.withWriteTransaction {
+        transactionDao.deleteByAccountId(id)
+        accountDao.deleteById(id)
+    }
+
     suspend fun addMainCategory(name: String): Long = addCategory(name, 1, null)
 
     suspend fun addSubCategory(name: String, parentId: Long): Long {
@@ -251,6 +257,19 @@ class FinanceRepository(private val database: AppDatabase) {
                 parentId = if (existing.level == 2) parentId else null
             )
         )
+    }
+
+    suspend fun deleteCategory(id: Long) = database.withWriteTransaction {
+        val category = categoryDao.getById(id) ?: return@withWriteTransaction
+        if (category.level == 1) {
+            budgetDao.deleteByCategoryId(id)
+            categoryDao.deleteByParentId(id)
+            transactionDao.deleteByL1CategoryId(id)
+            categoryDao.deleteById(id)
+        } else {
+            transactionDao.clearL2Category(id)
+            categoryDao.deleteById(id)
+        }
     }
 
     private suspend fun addCategory(name: String, level: Int, parentId: Long?): Long {
@@ -302,6 +321,9 @@ class FinanceRepository(private val database: AppDatabase) {
 
     fun observeBudgetProgress(period: BudgetPeriod, range: DateRange): Flow<List<BudgetProgressRow>> =
         budgetDao.observeProgress(period, range.startInclusive, range.endExclusive)
+
+    fun observeSubcategorySpend(range: DateRange): Flow<List<SubcategorySpendRow>> =
+        budgetDao.observeSubcategorySpend(range.startInclusive, range.endExclusive)
 
     suspend fun saveBudget(categoryId: Long, period: BudgetPeriod, amountLimitMinor: Long) {
         require(amountLimitMinor > 0L) { "Budget amount must be greater than zero" }

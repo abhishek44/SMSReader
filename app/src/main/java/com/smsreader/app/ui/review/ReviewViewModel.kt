@@ -128,6 +128,14 @@ private data class ReviewData(
         }
     }
 
+    fun deleteAccount(id: Long) {
+        viewModelScope.launch {
+            runCatching { financeRepository.deleteAccount(id) }
+                .onSuccess { _uiState.value = _uiState.value.copy(message = "Account deleted", error = null) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "Unable to delete account") }
+        }
+    }
+
     fun addMainCategory(name: String) {
         viewModelScope.launch {
             runCatching { financeRepository.addMainCategory(name) }
@@ -147,6 +155,14 @@ private data class ReviewData(
             runCatching { financeRepository.updateCategory(id, name, parentId) }
                 .onSuccess { _uiState.value = _uiState.value.copy(message = "Category updated", error = null) }
                 .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "Unable to update category") }
+        }
+    }
+
+    fun deleteCategory(id: Long) {
+        viewModelScope.launch {
+            runCatching { financeRepository.deleteCategory(id) }
+                .onSuccess { _uiState.value = _uiState.value.copy(message = "Category deleted", error = null) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "Unable to delete category") }
         }
     }
 

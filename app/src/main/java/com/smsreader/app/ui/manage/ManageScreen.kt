@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -62,6 +64,8 @@ fun ManageScreen(
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<AccountEntity?>(null) }
     var categoryToEdit by remember { mutableStateOf<CategoryEntity?>(null) }
+    var accountToDelete by remember { mutableStateOf<AccountEntity?>(null) }
+    var categoryToDelete by remember { mutableStateOf<CategoryEntity?>(null) }
 
     val exportCsvLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
@@ -93,7 +97,7 @@ fun ManageScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("Manage") },
+                title = { Text("Settings & Data") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -216,12 +220,21 @@ fun ManageScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    IconButton(onClick = { accountToEdit = account }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Edit Account",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
+                                    Row {
+                                        IconButton(onClick = { accountToEdit = account }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit Account",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        IconButton(onClick = { accountToDelete = account }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Delete Account",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
                                     }
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -278,12 +291,21 @@ fun ManageScreen(
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    IconButton(onClick = { categoryToEdit = mainCat }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Edit Category",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
+                                    Row {
+                                        IconButton(onClick = { categoryToEdit = mainCat }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit Category",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        IconButton(onClick = { categoryToDelete = mainCat }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Delete Category",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
                                     }
                                 }
 
@@ -302,12 +324,21 @@ fun ManageScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.weight(1f)
                                         )
-                                        IconButton(onClick = { categoryToEdit = subCat }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = "Edit Subcategory",
-                                                tint = MaterialTheme.colorScheme.secondary
-                                            )
+                                        Row {
+                                            IconButton(onClick = { categoryToEdit = subCat }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Edit Subcategory",
+                                                    tint = MaterialTheme.colorScheme.secondary
+                                                )
+                                            }
+                                            IconButton(onClick = { categoryToDelete = subCat }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete Subcategory",
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -395,6 +426,32 @@ fun ManageScreen(
         )
     }
 
+    accountToDelete?.let { account ->
+        AlertDialog(
+            onDismissRequest = { accountToDelete = null },
+            title = { Text("Delete Account") },
+            text = {
+                Text("Are you sure you want to delete \"${account.name}\"? All associated transactions will be permanently deleted.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteAccount(account.id)
+                        accountToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { accountToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showAddCategoryDialog) {
         AlertDialog(
             onDismissRequest = { showAddCategoryDialog = false },
@@ -431,6 +488,37 @@ fun ManageScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { categoryToEdit = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    categoryToDelete?.let { cat ->
+        AlertDialog(
+            onDismissRequest = { categoryToDelete = null },
+            title = { Text("Delete ${if (cat.level == 1) "Category" else "Subcategory"}") },
+            text = {
+                Text(
+                    if (cat.level == 1)
+                        "Are you sure you want to delete \"${cat.name}\"? All subcategories, budgets, and associated transactions will be permanently deleted."
+                    else
+                        "Are you sure you want to delete subcategory \"${cat.name}\"?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCategory(cat.id)
+                        categoryToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToDelete = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
