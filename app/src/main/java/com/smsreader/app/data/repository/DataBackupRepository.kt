@@ -120,6 +120,9 @@ class DataBackupRepository(private val database: AppDatabase) {
                             put("transactionType", tx.transactionType.name)
                             put("l1CategoryId", tx.l1CategoryId)
                             put("l2CategoryId", tx.l2CategoryId ?: JSONObject.NULL)
+                            put("statementDate", tx.statementDate ?: JSONObject.NULL)
+                            put("sourceFile", tx.sourceFile ?: JSONObject.NULL)
+                            put("sourceSmsId", tx.sourceSmsId ?: JSONObject.NULL)
                             put("notes", tx.notes ?: JSONObject.NULL)
                             put("createdAt", tx.createdAt)
                         })
@@ -219,6 +222,9 @@ class DataBackupRepository(private val database: AppDatabase) {
                     transactionType = TransactionType.valueOf(obj.getString("transactionType")),
                     l1CategoryId = obj.getLong("l1CategoryId"),
                     l2CategoryId = if (obj.isNull("l2CategoryId")) null else obj.getLong("l2CategoryId"),
+                    statementDate = if (obj.isNull("statementDate")) null else obj.optLong("statementDate"),
+                    sourceFile = if (obj.isNull("sourceFile")) null else obj.optString("sourceFile"),
+                    sourceSmsId = if (obj.isNull("sourceSmsId")) null else obj.optLong("sourceSmsId"),
                     notes = if (obj.isNull("notes")) null else obj.getString("notes"),
                     createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                 )

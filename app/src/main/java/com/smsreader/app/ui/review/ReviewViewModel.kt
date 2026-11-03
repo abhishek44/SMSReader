@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smsreader.app.data.local.dao.ConfirmedReviewItemRow
 import com.smsreader.app.data.local.entity.AccountEntity
 import com.smsreader.app.data.local.entity.CategoryEntity
 import com.smsreader.app.data.local.entity.SmsReviewItemEntity
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 
 data class ReviewUiState(
     val pending: List<SmsReviewItemEntity> = emptyList(),
+    val reviewed: List<ConfirmedReviewItemRow> = emptyList(),
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val isSyncing: Boolean = false,
@@ -40,18 +42,28 @@ class ReviewViewModel(
         viewModelScope.launch {
             combine(
                 reviewRepository.observePending(),
+                reviewRepository.observeConfirmed(),
                 financeRepository.observeAccounts(),
                 financeRepository.observeCategories()
-            ) { pending, accounts, categories -> Triple(pending, accounts, categories) }
-                .collect { (pending, accounts, categories) ->
-                    _uiState.value = _uiState.value.copy(
-                        pending = pending,
-                        accounts = accounts,
-                        categories = categories
-                    )
-                }
+            ) { pending, reviewed, accounts, categories ->
+                ReviewData(pending, reviewed, accounts, categories)
+            }.collect { data ->
+                _uiState.value = _uiState.value.copy(
+                    pending = data.pending,
+                    reviewed = data.reviewed,
+                    accounts = data.accounts,
+                    categories = data.categories
+                )
+            }
         }
     }
+
+private data class ReviewData(
+    val pending: List<SmsReviewItemEntity>,
+    val reviewed: List<ConfirmedReviewItemRow>,
+    val accounts: List<AccountEntity>,
+    val categories: List<CategoryEntity>
+)
 
     fun onSmsPermissionAvailable(nowMillis: Long = System.currentTimeMillis()) {
         if (_uiState.value.isSyncing) return

@@ -5,6 +5,7 @@ import com.smsreader.app.data.local.AppDatabase
 import com.smsreader.app.data.local.dao.AnalyticsSummaryRow
 import com.smsreader.app.data.local.dao.BudgetProgressRow
 import com.smsreader.app.data.local.dao.CategorySpendRow
+import com.smsreader.app.data.local.dao.ConfirmedReviewItemRow
 import com.smsreader.app.data.local.entity.AccountEntity
 import com.smsreader.app.data.local.entity.BudgetEntity
 import com.smsreader.app.data.local.entity.CategoryEntity
@@ -58,6 +59,7 @@ class SmsReviewRepository(
     private val categoryDao = database.categoryDao()
 
     fun observePending(): Flow<List<SmsReviewItemEntity>> = reviewDao.observeByStatus(SmsReviewStatus.PENDING)
+    fun observeConfirmed(): Flow<List<ConfirmedReviewItemRow>> = reviewDao.observeConfirmedRows()
 
     suspend fun syncOnAppOpen(nowMillis: Long = System.currentTimeMillis()): SmsScanResult {
         val state = syncDao.get() ?: SmsSyncStateEntity()

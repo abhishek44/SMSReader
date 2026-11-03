@@ -105,7 +105,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel) {
                 item { Text("No debit transactions in this period.") }
             } else {
                 val max = state.snapshot.categorySpend.maxOfOrNull { it.totalMinor }?.coerceAtLeast(1L) ?: 1L
-                items(state.snapshot.categorySpend, key = { it.categoryId }) { row ->
+                items(state.snapshot.categorySpend, key = { "category_${it.categoryId}" }) { row ->
                     Column(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(row.categoryName)
@@ -120,7 +120,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel) {
             }
 
             item { Text("Recent transactions", style = MaterialTheme.typography.titleLarge) }
-            items(state.snapshot.recent, key = { it.id }) { tx ->
+            items(state.snapshot.recent, key = { "tx_${it.id}" }) { tx ->
                 Card(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {

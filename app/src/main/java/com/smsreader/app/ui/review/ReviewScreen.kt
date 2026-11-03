@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -35,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +70,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.smsreader.app.data.local.dao.ConfirmedReviewItemRow
 import com.smsreader.app.data.local.entity.AccountEntity
 import com.smsreader.app.data.local.entity.CategoryEntity
 import com.smsreader.app.data.local.entity.SmsReviewItemEntity
@@ -75,6 +79,8 @@ import com.smsreader.app.domain.model.TransactionType
 import com.smsreader.app.ui.components.SelectionButton
 import com.smsreader.app.util.Dates
 import com.smsreader.app.util.Money
+
+private enum class ReviewTab { PENDING, REVIEWED }
 
 @Composable
 fun ReviewScreen(
@@ -88,7 +94,9 @@ fun ReviewScreen(
     var hasPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED)
     }
-    var selectedItem by remember { mutableStateOf<SmsReviewItemEntity?>(null) }
+    var selectedPendingItem by remember { mutableStateOf<SmsReviewItemEntity?>(null) }
+    var selectedReviewedItem by remember { mutableStateOf<ConfirmedReviewItemRow?>(null) }
+    var selectedTab by rememberSaveable { mutableStateOf(ReviewTab.PENDING) }
     var permissionRequested by rememberSaveable { mutableStateOf(false) }
     var permissionBlocked by rememberSaveable { mutableStateOf(false) }
 
@@ -162,27 +170,68 @@ fun ReviewScreen(
                     }
                 )
             } else {
-                Column(Modifier.fillMaxWidth()) {
-                    Text("Pending: ${state.pending.size}", style = MaterialTheme.typography.titleMedium)
-                    Text("First run imports the previous 3 months.", style = MaterialTheme.typography.bodySmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedTab == ReviewTab.PENDING,
+                        onClick = { selectedTab = ReviewTab.PENDING },
+                        label = { Text("Pending (${state.pending.size})") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = selectedTab == ReviewTab.REVIEWED,
+                        onClick = { selectedTab = ReviewTab.REVIEWED },
+                        label = { Text("Reviewed (${state.reviewed.size})") },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                Spacer(Modifier.height(12.dp))
-                if (state.isSyncing && state.pending.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                } else if (state.pending.isEmpty()) {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(20.dp)) {
-                            Text("Nothing to review", style = MaterialTheme.typography.titleMedium)
-                            Text("New transaction alerts will appear here the next time you scan the SMS inbox.")
+                Spacer(Modifier.height(8.dp))
+
+                when (selectedTab) {
+                    ReviewTab.PENDING -> {
+                        Text("First run imports the previous 3 months.", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(8.dp))
+                        if (state.isSyncing && state.pending.isEmpty()) {
+                            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        } else if (state.pending.isEmpty()) {
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(20.dp)) {
+                                    Text("Nothing to review", style = MaterialTheme.typography.titleMedium)
+                                    Text("New transaction alerts will appear here the next time you scan the SMS inbox.")
+                                }
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(state.pending, key = { "pending_${it.id}" }) { item ->
+                                    ReviewCard(
+                                        item = item,
+                                        onClick = { selectedPendingItem = item }
+                                    )
+                                }
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(state.pending, key = { it.id }) { item ->
-                            ReviewCard(
-                                item = item,
-                                onClick = { selectedItem = item }
-                            )
+                    ReviewTab.REVIEWED -> {
+                        Text("Transactions confirmed and saved to your records.", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(8.dp))
+                        if (state.reviewed.isEmpty()) {
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(20.dp)) {
+                                    Text("No reviewed transactions yet", style = MaterialTheme.typography.titleMedium)
+                                    Text("Transactions you confirm from the pending tab will be listed here.")
+                                }
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(state.reviewed, key = { "reviewed_${it.reviewItemId}" }) { item ->
+                                    ReviewedCard(
+                                        item = item,
+                                        onClick = { selectedReviewedItem = item }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -190,24 +239,31 @@ fun ReviewScreen(
         }
     }
 
-    selectedItem?.let { item ->
+    selectedPendingItem?.let { item ->
         TransactionReviewDialog(
             item = item,
             accounts = state.accounts,
             categories = state.categories,
-            onDismiss = { selectedItem = null },
+            onDismiss = { selectedPendingItem = null },
             onSave = {
                 viewModel.confirm(it)
-                selectedItem = null
+                selectedPendingItem = null
             },
             onIgnore = {
                 viewModel.ignore(item.id)
-                selectedItem = null
+                selectedPendingItem = null
             },
             onAddAccount = {
-                selectedItem = null
+                selectedPendingItem = null
                 onNavigateToManage()
             }
+        )
+    }
+
+    selectedReviewedItem?.let { item ->
+        ReviewedTransactionDetailsDialog(
+            item = item,
+            onDismiss = { selectedReviewedItem = null }
         )
     }
 }
@@ -342,6 +398,127 @@ private fun ReviewCard(item: SmsReviewItemEntity, onClick: () -> Unit) {
 }
 
 @Composable
+private fun ReviewedCard(item: ConfirmedReviewItemRow, onClick: () -> Unit) {
+    val titleText = item.merchantName ?: item.sender ?: item.description
+    val avatarChar = titleText.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar() ?: 'R'
+    val isDebit = item.transactionType == TransactionType.DEBIT
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = avatarChar.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${if (isDebit) "−" else "+"}${Money.format(item.amountMinor, item.currency)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDebit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val categoryText = if (item.l2CategoryName != null) {
+                        "${item.l1CategoryName} • ${item.l2CategoryName}"
+                    } else {
+                        item.l1CategoryName
+                    }
+                    Text(
+                        text = "${item.accountName} • $categoryText",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = Dates.format(item.transactionDate),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Confirmed",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "Reviewed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TransactionReviewDialog(
     item: SmsReviewItemEntity,
     accounts: List<AccountEntity>,
@@ -360,6 +537,7 @@ private fun TransactionReviewDialog(
     var type by remember(item.id) { mutableStateOf(item.suggestedType ?: TransactionType.DEBIT) }
     var amount by remember(item.id) { mutableStateOf(Money.editable(item.detectedAmountMinor)) }
     var merchant by remember(item.id) { mutableStateOf(item.detectedMerchant.orEmpty()) }
+    var notes by remember(item.id) { mutableStateOf("") }
     var transactionDate by remember(item.id) { mutableLongStateOf(item.receivedAt) }
     var showDatePicker by remember { mutableStateOf(false) }
     var validation by remember { mutableStateOf<String?>(null) }
@@ -374,7 +552,10 @@ private fun TransactionReviewDialog(
         title = { Text("Review transaction") },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Surface(
@@ -468,6 +649,14 @@ private fun TransactionReviewDialog(
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Date: ${Dates.format(transactionDate)}")
                 }
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    singleLine = false,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 validation?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
@@ -492,7 +681,8 @@ private fun TransactionReviewDialog(
                             merchantName = merchant.ifBlank { null },
                             description = merchant.ifBlank { item.body }.take(500),
                             transactionDate = transactionDate,
-                            transactionType = type
+                            transactionType = type,
+                            notes = notes.ifBlank { null }
                         )
                     )
                 }
@@ -522,5 +712,88 @@ private fun TransactionReviewDialog(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
         ) { DatePicker(state = picker) }
+    }
+}
+
+@Composable
+private fun ReviewedTransactionDetailsDialog(
+    item: ConfirmedReviewItemRow,
+    onDismiss: () -> Unit
+) {
+    val categoryText = if (item.l2CategoryName != null) {
+        "${item.l1CategoryName} • ${item.l2CategoryName}"
+    } else {
+        item.l1CategoryName
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reviewed Transaction") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = item.merchantName ?: item.description,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${if (item.transactionType == TransactionType.DEBIT) "−" else "+"}${Money.format(item.amountMinor, item.currency)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                DetailRow("Account", item.accountName)
+                DetailRow("Category", categoryText)
+                DetailRow("Type", item.transactionType.name)
+                DetailRow("Date", Dates.format(item.transactionDate))
+                if (!item.sender.isNullOrBlank()) {
+                    DetailRow("Sender", item.sender)
+                }
+
+                HorizontalDivider()
+
+                Text("Original SMS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = item.body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }

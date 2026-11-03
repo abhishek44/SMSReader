@@ -79,7 +79,7 @@ fun BudgetScreen(viewModel: BudgetViewModel) {
                     }
                 }
             } else {
-                items(state.rows, key = { it.budgetId }) { row ->
+                items(state.rows, key = { "budget_${it.budgetId}" }) { row ->
                     val progress = if (row.limitMinor <= 0) 0f else (row.spentMinor.toFloat() / row.limitMinor.toFloat()).coerceIn(0f, 1f)
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -13,6 +13,7 @@ import com.smsreader.app.data.local.entity.SmsReviewStatus
 import com.smsreader.app.data.local.entity.SmsSyncStateEntity
 import com.smsreader.app.data.local.entity.TransactionEntity
 import com.smsreader.app.domain.model.BudgetPeriod
+import com.smsreader.app.domain.model.TransactionType
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -85,7 +86,55 @@ interface SmsReviewDao {
 
     @Query("UPDATE sms_review_items SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: SmsReviewStatus)
+
+    @Query(
+        """
+        SELECT
+            r.id AS reviewItemId,
+            r.sender AS sender,
+            r.body AS body,
+            r.received_at AS receivedAt,
+            COALESCE(t.id, 0) AS transactionId,
+            COALESCE(t.amount_minor, r.detected_amount_minor) AS amountMinor,
+            COALESCE(t.currency, r.detected_currency, 'INR') AS currency,
+            COALESCE(t.merchant_name, r.detected_merchant) AS merchantName,
+            COALESCE(t.description, r.body) AS description,
+            COALESCE(t.transaction_date, r.received_at) AS transactionDate,
+            COALESCE(t.transaction_type, r.suggested_type, 'DEBIT') AS transactionType,
+            COALESCE(a.name, 'Account') AS accountName,
+            COALESCE(c1.name, 'Category') AS l1CategoryName,
+            c2.name AS l2CategoryName
+        FROM sms_review_items r
+        LEFT JOIN transactions t ON (
+            t.source_sms_id = r.source_sms_id
+            OR (t.transaction_date = r.received_at AND t.amount_minor = r.detected_amount_minor)
+        )
+        LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c1 ON c1.id = t.l1_category_id
+        LEFT JOIN categories c2 ON c2.id = t.l2_category_id
+        WHERE r.status = 'CONFIRMED'
+        ORDER BY COALESCE(t.transaction_date, r.received_at) DESC
+        """
+    )
+    fun observeConfirmedRows(): Flow<List<ConfirmedReviewItemRow>>
 }
+
+data class ConfirmedReviewItemRow(
+    val reviewItemId: Long,
+    val sender: String?,
+    val body: String,
+    val receivedAt: Long,
+    val transactionId: Long,
+    val amountMinor: Long,
+    val currency: String,
+    val merchantName: String?,
+    val description: String,
+    val transactionDate: Long,
+    val transactionType: TransactionType,
+    val accountName: String,
+    val l1CategoryName: String,
+    val l2CategoryName: String?
+)
 
 @Dao
 interface SmsSyncStateDao {
